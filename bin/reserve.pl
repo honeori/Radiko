@@ -7,93 +7,121 @@ use Data::Dumper;
 use Encode qw{decode is_utf8};
 binmode(STDOUT, ":utf8");
 
+#TODO
+#ファイル分割
+#レスポンスコード確認
+#超A&G
+
 my %RADIKO_API = (
   today =>'http://radiko.jp/v2/api/program/today',
-  tommorow => 'http://radiko.jp/v2/api/program/today',
+  tomorrow => 'http://radiko.jp/v2/api/program/tomorrow',
+  weekly =>'http://radiko.jp/v2/api/program/station/weekly',
 );
 
+my $RESERVE_LIST_FILE = 'reserveList.data';
+my $AREA_ID = 'JP13';
+my $CRON_FILE = '_cron.txt';
 
-sub getTodayShowFromWords {
-  my $this = shift;
-  my $wordList = @_;
-  return &_getShowFromWords($this, 'today', $wordList);
-}
 
-sub getTommorowShowFromWords {
-  my $this = shift;
-  my $wordList = @_;
-  return &_getShowFromWords($this, 'tommorow', $wordList);
-}
-sub _getShowFromWords {
-  my $this = shift;
-  my $mode = 'tommorow';
-  my @wordList = @_;
-}
-
-my $mode = 'today';
-my $uri = URI->new($RADIKO_API{$mode});
-$uri->query_form(
-      area_id => 'JP13',
-);
-my $content = get $uri;
+my $content = getTodayContent($AREA_ID);
+#my $content = getWeeklyContent('TBS');
 my $tree = XML::TreeBuilder->new;
 $tree->parse($content);
 $tree->eof;
 #print $content;
 
-#foreach my $title($tree->find('title')) {
-#print $title->as_text;
-##print $title->as_HTML;
-#print "\n";
-#}
-#foreach my $station ($tree->look_down("id", "TBS")) {
-#  print $station->attr('id');
-#  print "\n";
-#}
+my @reserveList = getReserveWords();
 
-#my @RESERVE_LIST = qw{西川　森};
-#my @RESERVE_LIST = qw{fax br};
-my @RESERVE_LIST = ("天気予報");
-@RESERVE_LIST = map{decode('utf8', $_);} @RESERVE_LIST;
-#my $regExp = '('. join('|', @RESERVE_LIST). ')'; 
-#my $regExp = join( '|', @RESERVE_LIST);
-my $regExp;
-foreach my $word (@RESERVE_LIST) {
-  if(!defined($regExp)) {
-    $regExp = '('.$word.')';
-  } else {
-    $regExp .= '|'. '('.$word.')';
-  }
-}
-
-
-print $regExp, "\n";
-
-my $progRef;
-foreach my $prog ($tree->find('prog')) {
-  my $text = $prog->as_text;
-  #print $text, "\n";
-  if($text =~ /$regExp/) {
-    my ($year, $month, $day, $hour, $minute, $second) = 
-      parseDate($prog->attr('ft'));
-    $progRef->{title} = $prog->find('title')->as_text;
-    $progRef->{year} = $year;
-    $progRef->{month} = $month;
-    $progRef->{day} = $day;
-    $progRef->{hour} = $hour;
-    $progRef->{minute} = $minute;
-    $progRef->{second} = $second;
-    $progRef->{length} = $prog->attr('dur');
-    $progRef->{url} = $prog->find('url')->as_text;
-    $progRef->{keyword} = $1;
-    foreach my $key(keys %$progRef) {
-      print "$key:", $progRef->{$key}, "\n";
+my @cronList;
+foreach my $station($tree->find('station')) {
+  foreach my $prog ($station->find('prog')) {
+    my $progRef;
+    my $text = $prog->as_text;
+    #print $text, "\n";
+    foreach my $regExp(@reserveList) {
+      if($text =~ /($regExp)/) {
+        my $keyword = $1;
+        my ($year, $month, $day, $hour, $minute, $second) = 
+          parseDate($prog->attr('ft'));
+        $progRef->{title} = $prog->find('title')->as_text;
+        $progRef->{year} = $year;
+        $progRef->{month} = $month;
+        $progRef->{day} = $day;
+        $progRef->{hour} = $hour;
+        $progRef->{minute} = $minute;
+        $progRef->{second} = $second;
+        $progRef->{length} = $prog->attr('dur');
+        $progRef->{url} = $prog->find('url')->as_text;
+        $progRef->{station} = $station->attr('id');
+        $progRef->{keyword} = $keyword;
+        #foreach my $key(keys %$progRef) {
+        #  print "$key:", $progRef->{$key}, "\n";
+        #}
+        #print "title\t", $progRef->{title}, "\n";
+        print getCronFromProgRef($progRef), "\n";
+        push @cronList, getCronFromProgRef($progRef);
+        last;
+      }
     }
-    print "\n";
   }
 }
 
-#59 2 * * 3 /home/stlange/script/radiko/radiko.sh LFR 122 moto >mylog/log.txt 2>&1
+addCron(@cronList);
+
+sub _getContent {
+  my $uri = shift;
+  return get $uri;
+}
+
+sub getTodayContent {
+  my $area_id = shift;
+  my $uri = URI->new($RADIKO_API{today});
+  $uri->query_form(
+    area_id => $area_id,
+  );
+  return _getContent $uri;
+}
+
+sub getTommorowContent {
+  my $area_id = shift;
+  my $uri = URI->new($RADIKO_API{tomorrow});
+  $uri->query_form(
+    area_id => $area_id,
+  );
+  return _getContent $uri;
+}
+
+sub getWeeklyContent {
+  my $station = shift;
+  my $uri = URI->new($RADIKO_API{weekly});
+  $uri->query_form(
+    station_id=>$station,
+  );
+  return _getContent $uri;
+}
+
+sub addCron {
+  my @cronLines = @_;
+  system 'crontab -l > '. $CRON_FILE;
+  open my $fh, '>>', $CRON_FILE or die"can't open $CRON_FILE:$!";
+  print $fh '#begin radiko autoReserve', "\n";
+  foreach my $line (@cronLines) {
+    print $fh $line, "\n";
+  }
+  print $fh '#end radiko autoReserve', "\n";
+  unlink $CRON_FILE;
+}
+
+sub getReserveWords {
+  my @reserveList;
+  open my $fh, '<', $RESERVE_LIST_FILE or die "can't open $RESERVE_LIST_FILE:$!";
+  while(<$fh>) {
+    chomp;
+    push @reserveList, $_;
+  }
+
+  @reserveList = map{decode('utf8', $_);} @reserveList;
+}
 
 sub parseDate {
   my $str = shift;
@@ -105,5 +133,22 @@ sub parseDate {
     print STDERR "parse error";
     return undef;
   }
+}
+
+#59 2 * * 3 /home/stlange/script/radiko/radiko.sh LFR 122 moto >mylog/log.txt 2>&1
+sub getCronFromProgRef {
+  my $prog = shift;
+  my $minute = $prog->{minute};
+  my $hour = $prog->{hour};
+  my $day = $prog->{day};
+  my $month = $prog->{month};
+  my $duration = $prog->{length};
+  $duration /= 60;
+  $duration += 1; #一応後ろ１分余分に録音
+  #TODO 前一分もとりたい
+  my $str = "$minute\t$hour\t$day\t$month\t*\t";
+  $str .= '/home/stlange/script/radiko/radiko.sh';
+  $str .= "\t". $prog->{station}. "\t$duration\t". 'autoReserve'. "\t". '>mylog/log.txt 2>&1';
+  return $str;
 }
 
