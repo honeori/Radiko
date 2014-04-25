@@ -9,9 +9,13 @@ use Encode qw{decode is_utf8 encode};
 use FindBin;
 use File::Spec; 
 use lib "$FindBin::RealBin/../lib";
+use File::Basename qw{dirname};
+
+
 use RadikoDb;
 binmode(STDOUT, ":utf8");
 
+#TODO
 #ファイル分割
 #超A&G
 
@@ -21,13 +25,18 @@ my %RADIKO_API = (
   weekly =>'http://radiko.jp/v2/api/program/station/weekly',
 );
 
-my $ON_DEBUG = 1;
+#my $ON_DEBUG = 1;
+my $ON_DEBUG = 0;
 
 my $RESERVE_LIST_FILE = 'reserveList.data';
 my $CRON_FILE = '_cron.txt';
 my $RESERVE_LAST_DATE = '_lastdate.txt';
+my $ABS_BASE = dirname $0;
+$ABS_BASE .= '/';
+$RESERVE_LIST_FILE = $ABS_BASE . $RESERVE_LIST_FILE;
+$CRON_FILE= $ABS_BASE . $CRON_FILE;
+$RESERVE_LAST_DATE = $ABS_BASE . ($RESERVE_LAST_DATE);
 my $AREA_ID = 'JP13';
-
 
 main();
 
@@ -47,7 +56,9 @@ sub main {
     exit(0);
   }
 
-  my $DB = RadikoDb->new(1);
+  my $DB = RadikoDb->new({
+    debug => 1,
+  });
   if(!$DB->hasRecordedInLineup($date)) {
     print "not have\n";
     $DB->insertLineup($content, $date);
@@ -85,6 +96,9 @@ sub main {
           print "keyword\t", $progRef->{keyword}, "\n";
           #print getCronFromProgRef($progRef), "\n";
           push @cronList, getCronFromProgRef($progRef);
+          if($ON_DEBUG) {
+            print $progRef->{title}
+          }
           last;
         }
       }
