@@ -124,47 +124,34 @@ sub checkDate {
   if(!defined($date)) {
     return 0;
   }
+  my $lastDate = getLastDate();
 
-  my ($year, $month, $day);
-  if($date =~ /(\d{4})-(\d{2})-(\d{2})/) {
-    $year = $1;
-    $month = $2;
-    $day = $3;
-  } elsif($date =~ /(\d{4})(\d{2})(\d{2})/) {
-    $year = $1;
-    $month = $2;
-    $day = $3;
-  } else {
-    die '$date error';
-  }
-  unless (-e $RESERVE_LAST_DATE) {
-    return 1;
-  }
-  open my $fh, '<', $RESERVE_LAST_DATE or die qq{ can't open $RESERVE_LAST_DATE:$!};
-  my $lastDate;
-  while(<$fh>) {
-    chomp;
-    $lastDate = $_;
-  }
-
-  use Date::Calc qw(Date_to_Days);
-  my $lastDateHash = {};
-  if(!defined($lastDate)) {
-    return 1;
-  } else {
+  my $parseDate = sub {
+    my $date = shift;
     my ($year, $month, $day);
-    if($lastDate =~ /(\d{4})-(\d{2})-(\d{2})/) {
-      $lastDateHash->{year} = $1;
-      $lastDateHash->{month} = $2;
-      $lastDateHash->{day} = $3;
-    } elsif($lastDate =~ /(\d{4})(\d{2})(\d{2})/) {
-      $lastDateHash->{year} = $1;
-      $lastDateHash->{month} = $2;
-      $lastDateHash->{day} = $3;
+    if($date =~ /(\d{4})-(\d{2})-(\d{2})/) {
+      $year = $1;
+      $month = $2;
+      $day = $3;
+    } elsif($date =~ /(\d{4})(\d{2})(\d{2})/) {
+      $year = $1;
+      $month = $2;
+      $day = $3;
     } else {
       die '$date error';
     }
+    return ($year, $month, $day);
+  };
+  my ($year, $month, $day) = $parseDate->($date);
+  my $lastDateHash = {};
+
+  if(!defined($lastDate)) {
+    return 1;
+  } else {
+    ($lastDateHash->{year}, $lastDateHash->{month}, $lastDateHash->{day})
+      = $parseDate->($lastDate);
   }
+  use Date::Calc qw(Date_to_Days);
   if($ON_DEBUG) {
     print "\n";
     print "date: $date\t", Date_to_Days($lastDateHash->{year}, $lastDateHash->{month}, $lastDateHash->{day}), "\n" ;
@@ -174,6 +161,17 @@ sub checkDate {
   return Date_to_Days($lastDateHash->{year}, $lastDateHash->{month}, $lastDateHash->{day} ) 
           < Date_to_Days($year, $month, $day);
 }
+
+sub getLastDate {
+  open my $fh, '<', $RESERVE_LAST_DATE or die qq{ can't open $RESERVE_LAST_DATE:$!};
+  my $lastDate;
+  while(<$fh>) {
+    chomp;
+    $lastDate = $_;
+  }
+  return $lastDate;
+}
+
 
 sub _getContent {
   my $MAX_RETRY_COUNT = 3;
