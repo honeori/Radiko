@@ -25,8 +25,11 @@ my %RADIKO_API = (
   weekly =>'http://radiko.jp/v2/api/program/station/weekly',
 );
 
-#my $ON_DEBUG = 1;
-my $ON_DEBUG = 0;
+my $ON_DEBUG = 1;
+#my $ON_DEBUG = 0;
+
+my $ON_CHECK_DATA = 1;
+#my $ON_CHECK_DATA = 0;
 
 my $RESERVE_LIST_FILE = 'reserveList.data';
 my $CRON_FILE = '_cron.txt';
@@ -51,9 +54,11 @@ sub main {
   $date =~ /^(\d{4})(\d{2})(\d{2})$/g;
   $date = "$1-$2-$3 00:00:00";
 
-  if(!checkDate($date)) {
-    print "$date shows is reserved";
-    exit(0);
+  if($ON_CHECK_DATA) {
+    if(!checkDate($date)) {
+      print "$date shows is reserved";
+      exit(0);
+    }
   }
 
   my $DB = RadikoDb->new({
@@ -148,11 +153,11 @@ sub checkDate {
     return 1;
   } else {
     my ($year, $month, $day);
-    if($date =~ /(\d{4})-(\d{2})-(\d{2})/) {
+    if($lastDate =~ /(\d{4})-(\d{2})-(\d{2})/) {
       $lastDateHash->{year} = $1;
       $lastDateHash->{month} = $2;
       $lastDateHash->{day} = $3;
-    } elsif($date =~ /(\d{4})(\d{2})(\d{2})/) {
+    } elsif($lastDate =~ /(\d{4})(\d{2})(\d{2})/) {
       $lastDateHash->{year} = $1;
       $lastDateHash->{month} = $2;
       $lastDateHash->{day} = $3;
@@ -165,6 +170,7 @@ sub checkDate {
     print "date: $date\t", Date_to_Days($lastDateHash->{year}, $lastDateHash->{month}, $lastDateHash->{day}), "\n" ;
     print "lastdate: $lastDate\t", Date_to_Days($year, $month, $day), "\n";
   }
+
   return Date_to_Days($lastDateHash->{year}, $lastDateHash->{month}, $lastDateHash->{day} ) 
           < Date_to_Days($year, $month, $day);
 }
