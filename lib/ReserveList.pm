@@ -25,20 +25,7 @@ sub new {
 sub getShowList {
 	my $this = shift;
 
-	my $retry_count = $this->{config}{RadikoAPI}{retry_count} // 3;
-	my $content;
-	foreach my $i (1..$retry_count) {
-		my $response =  $this->{ua}->get($this->_constructAPIURL);
-		if(defined($response) && $response->is_success) {
-			$content = $response->content;
-			last;
-		} else {
-			sleep 1;
-		}
-	}
-
-	return unless(defined($content));
-
+	my $content = $this->getRawShowList;
 	return $this->_convertXml($content);
 }
 
@@ -68,6 +55,25 @@ sub _convertXml {
 	return @rtn_array;
 }
 
+sub getRawShowList {
+	my $this = shift;
+
+	my $retry_count = $this->{config}{RadikoAPI}{retry_count} // 3;
+	my $content;
+	foreach my $i (1..$retry_count) {
+		my $response =  $this->{ua}->get($this->_constructAPIURL);
+		if(defined($response) && $response->is_success) {
+			$content = $response->content;
+			last;
+		} else {
+			sleep 1;
+		}
+	}
+
+	return unless(defined($content));
+
+	return $content;
+}
 
 sub _constructAPIURL {
 	my $this = shift;

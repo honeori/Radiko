@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Scope::Guard;
 use Test::Mock::LWP::Conditional;
 use HTTP::Response;
 use Config::Tiny;
@@ -11,6 +12,21 @@ use ReserveList;
 
 subtest 'get todays list' => sub {
 	my $config_file = '__test_config.ini';
+
+	my $setup = sub {
+		open my $fh, '>', $config_file or die;
+		print $fh q{
+[RadikoAPI]
+url = http://radiko.jp/v2/api/program/today
+area_id = JP13
+};
+		close $fh;
+		Scope::Guard->new(sub {
+			unlink $config_file;
+
+		});
+	}->();
+
 	my $today_xml = q{<?xml version="1.0" encoding="UTF-8"?><radiko>
   <ttl>1800</ttl>
   <srvtime>1431796776</srvtime>
@@ -39,13 +55,6 @@ subtest 'get todays list' => sub {
     </stations>
 </radiko>
 	};
-	open my $fh, '>', $config_file or die;
-	print $fh q{
-[RadikoAPI]
-url = http://radiko.jp/v2/api/program/today
-area_id = JP13
-};
-	close $fh;
 
 	my $config= Config::Tiny->read($config_file);
 	my $uri = URI->new($config->{RadikoAPI}{url});
@@ -56,7 +65,8 @@ area_id = JP13
 	Test::Mock::LWP::Conditional->stub_request(
 		$uri->as_string => $stub_response,
 	);
-	my @list = ReserveList->new($config_file)->getShowList;
+	my $obj = ReserveList->new($config_file);
+	my @list = $obj->getShowList;
 	use Data::Dumper; diag Dumper(\@list);
 	use utf8;
 	is_deeply \@list, [
@@ -84,7 +94,9 @@ area_id = JP13
 	];
 	no utf8;
 
-	unlink $config_file;
+	my $rawList = $obj->getRawShowList;
+	is $rawList, $today_xml;
+
 };
 
 done_testing;
