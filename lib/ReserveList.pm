@@ -6,6 +6,8 @@ use warnings;
 use Config::Tiny;
 use LWP::UserAgent;
 use XML::Simple qw(:strict);
+use MongoDB;
+use MongoDB::OID;
 
 sub new {
 	my $class = shift;
@@ -22,6 +24,10 @@ sub new {
 	}, $class;
 }
 
+sub getSavingDateList {
+	my $this = shift;
+	return {};
+}
 sub getShowList {
 	my $this = shift;
 
