@@ -98,18 +98,19 @@ sub _start_radiru {
     my ($file_name, $station, $duration) = @_;
 
     my $file = $this->_file_to_worksdir_path($file_name);
-    my $url = $this->{conf}{radiru}{url};
+    my $url = $this->{conf}{radiru}{"url_$station"};
     my $playpath = $this->{conf}{radiru}{"playpath_$station"};
     my $playerurl= $this->{conf}{radiru}{player_url};
 
     $this->_debug_print($file);
 
     my $record_command = qq{
-        $RTMPDUMP_PATH -v
+        $RTMPDUMP_PATH
         -r "$url"
         --playpath "$playpath"
         --app "live"
         -W $playerurl
+        --live 
         --stop $duration
         -o "$file"
     };
@@ -120,6 +121,11 @@ sub _start_radiru {
     #use Data::Dumper; $this->_debug_print(Dumper($this->{conf}{playpath}));
 
     my $result = system $record_command;
+    if($result == 0) {
+        return 1;
+    } else {
+        return;
+    }
 }
 
 sub _start_a_and_g {

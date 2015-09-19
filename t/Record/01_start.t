@@ -117,9 +117,7 @@ subtest 'A&G' => sub {
 };
 
 #NHK
-SKIP: {
 subtest 'radiru' => sub {
-    plan skip_all => 'rtmpdump version is less than 2.4';
     my $conf_file = 'radiko.ini.test';
     my $config = new Config::Tiny;
     $config->{global}{rtmpdump_path} = '/usr/local/bin/rtmpdump';
@@ -128,8 +126,10 @@ subtest 'radiru' => sub {
    $config->{global}{workdir} = './testbase';
     $config->{global}{savedir} = './savedir';
     $config->{global}{debug} = 1;
-    $config->{radiru}{url} = 'rtmpe://netradio-fm-flash.nhk.jp';
     $config->{radiru}{player_url} = 'http://www3.nhk.or.jp/netradio/files/swf/rtmpe.swf';
+    $config->{radiru}{url_R1} = 'rtmpe://netradio-r1-flash.nhk.jp';
+    $config->{radiru}{url_R2} = 'rtmpe://netradio-r2-flash.nhk.jp';
+    $config->{radiru}{url_FM} = 'rtmpe://netradio-fm-flash.nhk.jp';
     $config->{radiru}{playpath_R1} = 'NetRadio_R1_flash@63346';
     $config->{radiru}{playpath_R2} = 'NetRadio_R2_flash@63342';
     $config->{radiru}{playpath_FM} = 'NetRadio_FM_flash@63343';
@@ -158,22 +158,47 @@ subtest 'radiru' => sub {
     my $savedir = $config->{global}{savedir};
     my $dest_file = 'test.mp3';
 
-    #$recorder->convert($file, $dest_file);
+    ok $recorder->start(
+        $file,
+        'R2',
+        1,
+    ), 'start ok';
 
-#    ok -e "$savedir/$dest_file", 'convert ok';
-#    my $conv_file_type = `file $savedir/$dest_file`;
-#
-#    like $conv_file_type, qr/MPEG ADTS/, 'check file type';
-#
-#
-#    system "cp testbase/proc.log .";
-#    system "rm -rf $base";
-#    system "rm -rf $savedir";
-#    unlink $conf_file;
+    {
+        my $size = -s "$base/$file";
+        ok $size > 0, "rec ok $file";
+
+        my $flv_file_type = `file $base/$file`;
+        like $flv_file_type, qr/Macromedia Flash Video/, 'check flv file type';
+    }
+
+    ok $recorder->start(
+        $file,
+        'FM',
+        1,
+    ), 'start ok';
+
+    {
+        my $size = -s "$base/$file";
+        ok $size > 0, "rec ok $file";
+
+        my $flv_file_type = `file $base/$file`;
+        like $flv_file_type, qr/Macromedia Flash Video/, 'check flv file type';
+    }
+    $recorder->convert($file, $dest_file);
+
+    ok -e "$savedir/$dest_file", 'convert ok';
+    my $conv_file_type = `file $savedir/$dest_file`;
+
+    like $conv_file_type, qr/MPEG ADTS/, 'check file type';
+
+
+    system "cp testbase/proc.log .";
+    system "rm -rf $base";
+    system "rm -rf $savedir";
+    unlink $conf_file;
 
 };
-};
-
 
 done_testing;
 
